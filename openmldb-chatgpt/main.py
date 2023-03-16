@@ -12,6 +12,7 @@ import configparser
 from openmldb.dbapi import connect
 from openmldb.dbapi import DatabaseError
 from tabulate import tabulate
+import re
 
 config = configparser.ConfigParser()
 config_directory = os.path.join(os.path.expanduser("~"), ".openmldb/")
@@ -70,7 +71,7 @@ fruits_completer = WordCompleter(sql_keywords, ignore_case=True)
 session = PromptSession(history=FileHistory('history.txt'), auto_suggest=AutoSuggestFromHistory())
 
 
-def print_colorful_text(color, text, end='\n'):
+def print_colorful(color, text, end='\n'):
     color_codes = {
         'black': 30,
         'red': 31,
@@ -87,19 +88,19 @@ def print_colorful_text(color, text, end='\n'):
 
 
 def user_print(text, end='\n'):
-    print_colorful_text("blue", "USER > " + text, end)
+    print_colorful("blue", "USER > " + text, end)
 
 
 def gpt_print(text, end='\n'):
-    print_colorful_text("green", "GPT > " + text, end)
+    print_colorful("green", "GPT > " + text, end)
 
 
 def openmldb_print(text, end='\n'):
-    print_colorful_text("yellow", "OpenMLDB > " + text, end)
+    print_colorful("yellow", "OpenMLDB > " + text, end)
 
 history_message_queue = Queue(maxsize=10)
 
-system_message = {"role": "system", "content": "You are a helpful assistant."}
+system_message = {"role": "system", "content": "You are a helpful assistant. I am using OpenMLDB database and please generate SQL directly if possible"}
 
 def call_chatgpt(prompt):
     # Set up the API client
@@ -165,6 +166,21 @@ cursor = connection.cursor()
 
 #cursor.execute(f"create database if not exists {db_name}")
 
+def is_possible_sql(text: str)-> bool:
+    # Check if the text contains only English letters, digits, whitespace, and punctuation
+    pattern = r'^[A-Za-z0-9\s\.,;:!?\'"(){}\[\]+\-_]*$'
+    if not bool(re.match(pattern, text)):
+        return False
+
+    text = re.sub(r'--.*$', '', text, flags=re.MULTILINE)
+    text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+    text = text.strip()
+
+    # Check for common SQL keywords
+    keywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP', 'TRUNCATE', 'GRANT', 'REVOKE', 'SHOW', 'LOAD', 'SET']
+    return any([text.upper().startswith(keyword) for keyword in keywords])
+
+
 def is_dql(sql: str) -> bool:
     sql_keyword = sql.split()[0].upper()
     if sql_keyword in ["SELECT", "SHOW"]:
@@ -178,7 +194,28 @@ def is_show_joblog(sql: str) -> bool:
     else:
         return False
 
-def run_openmldb_sql(sql):
+help_message = """
+#######                      #     # #       ######  ######      #####                       #####  ######  #######
+#     # #####  ###### #    # ##   ## #       #     # #     #    #     # #    #   ##   ##### #     # #     #    #
+#     # #    # #      ##   # # # # # #       #     # #     #    #       #    #  #  #    #   #       #     #    #
+#     # #    # #####  # #  # #  #  # #       #     # ######     #       ###### #    #   #   #  #### ######     #
+#     # #####  #      #  # # #     # #       #     # #     #    #       #    # ######   #   #     # #          #
+#     # #      #      #   ## #     # #       #     # #     #    #     # #    # #    #   #   #     # #          #
+####### #      ###### #    # #     # ####### ######  ######      #####  #    # #    #   #    #####  #          #
+
+OpenMLDB ChatGPT 插件是一个集成了强大的 GPT 模型的 OpenMLDB 增强工具. 你可以在命令行中使用到以下功能：
+
+1. 直接执行 OpenMLDB SQL 语句，例如 "SELECT 100"、"SHOW JOBS" 等，可以立即返回结果。
+2. 如果 SQL 执行成功，你可以提问这个 SQL 的含义，例如输入"请解释上面的SQL含义"、"请为上面的SQL添加注释"。
+3. 如果 SQL 执行失败，你可以提问失败原因，例如输入 "请解释SQL执行失败原因"、"请帮我改正SQL语句"。
+4. 如果不了解SQL语法，你可以提问来自动生成，例如输入 "生成创建名为db1的数据库的SQL"、"帮我查询系统有多少张表"
+5. 如果你不知道要做什么或者想了解更多 OpenMLLDB 用法，可直接提问，例如输入 "介绍使用OpenMLDB落地AI应用的流程"。
+6. 所有自然语言提问都会保留上下文，可直接提问"上一个SQL是什么含义"、"请帮我优化上一个SQL语句"。
+7. 如果模型返回的结果补全（因为token数据限制），输入 "继续" 或者 "go on" 可继续查看模型返回的结果
+8. 使用 "help" 命令可打印帮助文档，使用 "q" 或 "quit" 命令可退出命令行。
+"""
+
+def run_openmldb_sql(sql) -> bool:
     try:
         cursor.execute(sql)
         rows = cursor.fetchall()
@@ -193,9 +230,13 @@ def run_openmldb_sql(sql):
         else:
             openmldb_print(f"Success to execute SQL. Rows affected: {cursor.rowcount}")
 
+        return True
     except DatabaseError as e:
         openmldb_print("Fail to execute SQL and get error message: ")
         openmldb_print(e.message)
+        return False
+
+
 
 
 def close():
@@ -203,13 +244,28 @@ def close():
     connection.close()
 
 
-while True:
-    try:
-        user_input = session.prompt('USER > ', completer=fruits_completer, style=style)
-        if user_input.lower() == 'q':
+def print_help_message():
+    print_colorful("blue", help_message)
+
+def main():
+    print_help_message()
+    while True:
+        try:
+            user_input = session.prompt('USER > ', completer=fruits_completer, style=style)
+            if user_input.lower() == 'q' or user_input.lower() == 'q' :
+                break
+            elif user_input.lower() == "help":
+                print_help_message()
+            else:
+              # print(f'You entered: {user_input}')
+              if is_possible_sql(user_input):
+                  is_success = run_openmldb_sql(user_input)
+                  # TODO: add message if success or fail
+              else:
+                  call_chatgpt(user_input)
+
+        except KeyboardInterrupt:
             break
-        # print(f'You entered: {user_input}')
-        #call_chatgpt(user_input)
-        run_openmldb_sql(user_input)
-    except KeyboardInterrupt:
-        break
+
+if __name__ == "__main__":
+    main()
