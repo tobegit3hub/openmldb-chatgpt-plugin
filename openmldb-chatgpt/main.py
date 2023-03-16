@@ -2,7 +2,6 @@
 
 import openai
 import os
-import openmldb
 from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.completion import WordCompleter
@@ -10,6 +9,9 @@ from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
 from queue import Queue
 import configparser
+from openmldb.dbapi import connect
+from openmldb.dbapi import DatabaseError
+from tabulate import tabulate
 
 config = configparser.ConfigParser()
 config_directory = os.path.join(os.path.expanduser("~"), ".openmldb/")
@@ -89,17 +91,15 @@ def user_print(text, end='\n'):
 
 
 def gpt_print(text, end='\n'):
-    print_colorful_text("green", "GPT  > " + text, end)
+    print_colorful_text("green", "GPT > " + text, end)
 
 
-def system_print(text, end='\n'):
-    print_colorful_text("yello", "SYS  > " + text, end)
-
+def openmldb_print(text, end='\n'):
+    print_colorful_text("yellow", "OpenMLDB > " + text, end)
 
 history_message_queue = Queue(maxsize=10)
 
 system_message = {"role": "system", "content": "You are a helpful assistant."}
-
 
 def call_chatgpt(prompt):
     # Set up the API client
@@ -157,12 +157,59 @@ style = Style.from_dict({
     '': '#ff00ff',
 })
 
+
+db_name = "db10"
+
+connection = connect(zk=config.get("OpenMLDB", "zk_cluster"), zkPath=config.get("OpenMLDB", "zk_root_path"))
+cursor = connection.cursor()
+
+#cursor.execute(f"create database if not exists {db_name}")
+
+def is_dql(sql: str) -> bool:
+    sql_keyword = sql.split()[0].upper()
+    if sql_keyword in ["SELECT", "SHOW"]:
+        return True
+    else:
+        return False
+
+def is_show_joblog(sql: str) -> bool:
+    if sql.lower().startswith("show joblog"):
+        return True
+    else:
+        return False
+
+def run_openmldb_sql(sql):
+    try:
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+        schema = [description[0] for description in cursor.description]
+
+        if is_dql(sql):
+            openmldb_print("Success to execute query SQL.")
+            if is_show_joblog(sql):
+                print(rows[0][0])
+            else:
+                print(tabulate(rows, headers=schema, tablefmt='grid'))
+        else:
+            openmldb_print(f"Success to execute SQL. Rows affected: {cursor.rowcount}")
+
+    except DatabaseError as e:
+        openmldb_print("Fail to execute SQL and get error message: ")
+        openmldb_print(e.message)
+
+
+def close():
+    cursor.close()
+    connection.close()
+
+
 while True:
     try:
         user_input = session.prompt('USER > ', completer=fruits_completer, style=style)
         if user_input.lower() == 'q':
             break
         # print(f'You entered: {user_input}')
-        call_chatgpt(user_input)
+        #call_chatgpt(user_input)
+        run_openmldb_sql(user_input)
     except KeyboardInterrupt:
         break
