@@ -1,0 +1,4 @@
+prompt_toolkit
+openmldb
+openai
+tabulate

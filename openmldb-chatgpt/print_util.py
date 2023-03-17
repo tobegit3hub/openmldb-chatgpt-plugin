@@ -28,4 +28,3 @@ class PrintUtil:
     @staticmethod
     def openmldb_print(text, end='\n'):
         PrintUtil.print_colorful("yellow", "OpenMLDB > " + text, end)
-
