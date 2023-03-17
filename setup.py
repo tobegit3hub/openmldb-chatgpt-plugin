@@ -14,7 +14,7 @@
 
 # Update the code and upload the package to pypi
 # 1. python ./setup.py bdist_wheel --universal
-# 2. twine upload dist/openmldb-chatgpt-x.x.x-py2.py3-none-any.whl
+# 2. twine upload dist/openmldb_chatgpt-x.x.x-py2.py3-none-any.whl
 
 from setuptools import setup, find_packages
 
