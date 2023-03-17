@@ -48,11 +48,12 @@ def main():
         '': '#ff00ff',
     })
 
-    # Connect with OpenAI API key
-    gpt_manager = GptManager(config.get("OpenAI", "api_key"), config.get("OpenAI", "model_engine"), int(config.get("OpenAI", "max_tokens")))
 
     # Connect with OpenMLDB
     openmldb_manager = OpenmldbManager(config.get("OpenMLDB", "zk_cluster"), config.get("OpenMLDB", "zk_root_path"))
+
+    # Connect with OpenAI API key
+    gpt_manager = GptManager(config.get("OpenAI", "api_key"), config.get("OpenAI", "model_engine"), int(config.get("OpenAI", "max_tokens")), openmldb_manager)
 
     # Print help message
     HelpUtil.print_help_message()
@@ -80,21 +81,21 @@ def main():
                         # Use GPT to anaylse SQL
                         gpt_prompt = f"分析成功执行的SQL语句'{user_input}'"
                         PrintUtil.gpt_print(gpt_prompt)
-                        gpt_manager.call_chatgpt(gpt_prompt, update_history_message=False)
+                        gpt_manager.run_gpt(gpt_prompt, update_history_message=False)
 
                         # Use GPT to suggest next step
                         gpt_prompt = f"执行完SQL语句'{user_input}'，然后建议执行什么操作"
                         PrintUtil.gpt_print(gpt_prompt)
-                        gpt_manager.call_chatgpt(gpt_prompt, update_history_message=False)
+                        gpt_manager.run_gpt(gpt_prompt, update_history_message=False)
                     else:
                         # Use GPT to anaylse the error message
                         gpt_prompt = f"分析SQL失败原因，SQL语句是'{user_input}'，错误信息是'{openmldb_manager.last_sql_error_message}'"
                         PrintUtil.gpt_print(gpt_prompt)
-                        gpt_manager.call_chatgpt(gpt_prompt, update_history_message=False)
+                        gpt_manager.run_gpt(gpt_prompt, update_history_message=False)
 
                 # Chat with GPT
                 else:
-                    gpt_manager.call_chatgpt(user_input)
+                    gpt_manager.run_gpt(user_input)
 
         except KeyboardInterrupt:
             break
