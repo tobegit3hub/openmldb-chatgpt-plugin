@@ -37,7 +37,7 @@ OpenMLDB ChatGPT 插件是一个集成了强大的 GPT 模型的 OpenMLDB 增强
 4. 如果不了解SQL语法或想了解OpenMLDB可直接提问，例如输入 "创建名为db1的数据库"、"查询系统有多少张表"
 5. 所有自然语言提问都会保留上下文，可直接提问"上一个SQL是什么含义"、"请帮我优化上一个SQL语句"。
 6. 如果模型返回的结果补全（因token数量限制），输入 "继续" 或者 "continuous" 继续查看模型返回的结果。
-7. 使用 "help" 命令可打印帮助文档，使用 "q" 或 "quit" 命令可退出命令行。
+7. 使用 "help" 命令可打印帮助文档，使用 "q"、"quit"、"exit" 命令可退出命令行。
 """
 
         PrintUtil.print_colorful("cyan", help_message)
