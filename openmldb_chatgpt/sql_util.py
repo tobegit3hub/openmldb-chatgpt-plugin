@@ -29,11 +29,14 @@ class SqlUtil:
         sql_keywords = ['SELECT', 'INSERT', 'LOAD', 'CREATE DATABASE', 'CREATE TABLE', 'FROM']
         return sql_keywords
 
+    def has_non_english_letters(text):
+        pattern = re.compile(r'[^\x00-\x7F]+')
+        return bool(pattern.search(text))
+
     @staticmethod
     def is_possible_sql(text: str) -> bool:
-        # Check if the text contains only English letters, digits, whitespace, and punctuation
-        pattern = r'^[A-Za-z0-9\s\.*,;:!?\'"(){}\[\]+\-_]*$'
-        if not bool(re.match(pattern, text)):
+        # Check if the text contains non English
+        if SqlUtil.has_non_english_letters(text):
             return False
 
         text = re.sub(r'--.*$', '', text, flags=re.MULTILINE)
@@ -42,7 +45,7 @@ class SqlUtil:
 
         # Check for common SQL keywords
         keywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP', 'TRUNCATE', 'GRANT', 'REVOKE',
-                    'SHOW', 'LOAD', 'SET', 'USE']
+                    'SHOW', 'LOAD', 'SET', 'USE', 'GET']
         return any([text.upper().startswith(keyword) for keyword in keywords])
 
     @staticmethod
