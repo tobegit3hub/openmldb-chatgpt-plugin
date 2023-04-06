@@ -58,47 +58,53 @@ def main():
     # Print help message
     HelpUtil.print_help_message()
 
+
+    def wait_and_handle():
+        # Get user command
+        user_input = cli_session.prompt('USER > ', completer=cli_completer, style=cli_style)
+
+        if user_input == "":
+            return
+
+        # Quit command
+        if user_input.lower() == 'q' or user_input.lower() == 'quit' or user_input.lower() == 'exit':
+            sys.exit(0)
+
+        # Help command
+        elif user_input.lower() == "help":
+            HelpUtil.print_help_message()
+
+        else:
+            # Run SQL
+            if SqlUtil.is_possible_sql(user_input):
+                # Run OpenMLDB SQL
+                is_success = openmldb_manager.run_openmldb_sql(user_input)
+
+                if is_success:
+                    # Use GPT to anaylse SQL
+                    gpt_prompt = f"分析成功执行的SQL语句'{user_input}'"
+                    PrintUtil.gpt_print(gpt_prompt)
+                    gpt_manager.run_gpt(gpt_prompt, update_history_message=False)
+
+                    # Use GPT to suggest next step
+                    gpt_prompt = f"执行完SQL语句'{user_input}'，然后建议执行什么操作"
+                    PrintUtil.gpt_print(gpt_prompt)
+                    gpt_manager.run_gpt(gpt_prompt, update_history_message=False)
+                else:
+                    # Use GPT to anaylse the error message
+                    gpt_prompt = f"分析SQL失败原因，SQL语句是'{user_input}'，错误信息是'{openmldb_manager.last_sql_error_message}'"
+                    PrintUtil.gpt_print(gpt_prompt)
+                    gpt_manager.run_gpt(gpt_prompt, update_history_message=False)
+
+            # Chat with GPT
+            else:
+                gpt_manager.run_gpt(user_input)
+
     while True:
         try:
-            # Get user command
-            user_input = cli_session.prompt('USER > ', completer=cli_completer, style=cli_style)
-
-            # Quit command
-            if user_input.lower() == 'q' or user_input.lower() == 'quit' or user_input.lower() == 'exit':
-                break
-
-            # Help command
-            elif user_input.lower() == "help":
-                HelpUtil.print_help_message()
-
-            else:
-                # Run SQL
-                if SqlUtil.is_possible_sql(user_input):
-                    # Run OpenMLDB SQL
-                    is_success = openmldb_manager.run_openmldb_sql(user_input)
-
-                    if is_success:
-                        # Use GPT to anaylse SQL
-                        gpt_prompt = f"分析成功执行的SQL语句'{user_input}'"
-                        PrintUtil.gpt_print(gpt_prompt)
-                        gpt_manager.run_gpt(gpt_prompt, update_history_message=False)
-
-                        # Use GPT to suggest next step
-                        gpt_prompt = f"执行完SQL语句'{user_input}'，然后建议执行什么操作"
-                        PrintUtil.gpt_print(gpt_prompt)
-                        gpt_manager.run_gpt(gpt_prompt, update_history_message=False)
-                    else:
-                        # Use GPT to anaylse the error message
-                        gpt_prompt = f"分析SQL失败原因，SQL语句是'{user_input}'，错误信息是'{openmldb_manager.last_sql_error_message}'"
-                        PrintUtil.gpt_print(gpt_prompt)
-                        gpt_manager.run_gpt(gpt_prompt, update_history_message=False)
-
-                # Chat with GPT
-                else:
-                    gpt_manager.run_gpt(user_input)
-
+            wait_and_handle()
         except KeyboardInterrupt:
-            break
+            pass
 
     # Close OpenMLDB connection
     openmldb_manager.close()
